@@ -2,16 +2,20 @@ from flask import Flask, request, jsonify, Response
 import json
 import os
 from datetime import datetime
-import threading
 import time
 
 app = Flask(__name__)
 
+# CORS header'ları nginx tarafından yönetiliyor
+# Flask-CORS kullanmıyoruz çünkü nginx zaten tüm CORS header'larını ekliyor
+
+# MCP Server bilgileri
 SERVER_INFO = {
     "name": "ZZeti-MCP-Server",
     "version": "1.0.0"
 }
 
+# Basit tool'lar - ZZeti'ye özel
 TOOLS = [
     {
         "name": "echo",
@@ -52,6 +56,14 @@ TOOLS = [
             "type": "object",
             "properties": {}
         }
+    },
+    {
+        "name": "zzeti_info",
+        "description": "Get information about ZZeti platform",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
     }
 ]
 
@@ -63,8 +75,12 @@ def health():
 
 
 # MCP endpoint - ana endpoint
-@app.route('/mcp', methods=['GET', 'POST'])
+@app.route('/mcp', methods=['GET', 'POST', 'OPTIONS'])
 def mcp():
+    # OPTIONS preflight
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     # GET isteği için (health check vb.)
     if request.method == 'GET':
         return jsonify({
@@ -77,6 +93,17 @@ def mcp():
     
     # POST isteği için (MCP protokolü)
     try:
+        # JSON parse
+        if not request.is_json:
+            return jsonify({
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32700,
+                    "message": "Parse error: Content-Type must be application/json"
+                }
+            }), 400
+        
         data = request.get_json()
         if not data:
             return jsonify({
@@ -85,6 +112,17 @@ def mcp():
                 "error": {
                     "code": -32700,
                     "message": "Parse error: Invalid JSON"
+                }
+            }), 400
+        
+        # JSON-RPC 2.0 validation
+        if data.get("jsonrpc") != "2.0":
+            return jsonify({
+                "jsonrpc": "2.0",
+                "id": data.get("id"),
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: jsonrpc must be '2.0'"
                 }
             }), 400
         
@@ -103,6 +141,7 @@ def mcp():
                 }
             }), 400
 
+        # MCP Methods
         if method == 'initialize':
             return jsonify({
                 "jsonrpc": "2.0",
@@ -126,23 +165,42 @@ def mcp():
             })
 
         elif method == 'tools/call':
-            tool_name = params.get('name')
-            tool_args = params.get('arguments', {})
+            tool_name = params.get('name') if isinstance(params, dict) else None
+            tool_args = params.get('arguments', {}) if isinstance(params, dict) else {}
+            
+            if not tool_name:
+                return jsonify({
+                    "jsonrpc": "2.0",
+                    "id": request_id,
+                    "error": {
+                        "code": -32602,
+                        "message": "Invalid params: 'name' is required"
+                    }
+                }), 400
 
             result = None
             if tool_name == 'echo':
                 result = {"text": tool_args.get('text', '')}
             elif tool_name == 'add':
-                result = {"sum": (tool_args.get('a', 0) or 0) + (tool_args.get('b', 0) or 0)}
+                a = tool_args.get('a', 0) or 0
+                b = tool_args.get('b', 0) or 0
+                result = {"sum": float(a) + float(b)}
             elif tool_name == 'get_time':
                 result = {"time": datetime.now().isoformat()}
+            elif tool_name == 'zzeti_info':
+                result = {
+                    "platform": "ZZeti",
+                    "description": "ZZeti MCP Platform - Model Context Protocol Server",
+                    "version": SERVER_INFO["version"],
+                    "features": ["MCP Protocol", "HTTP Transport", "Tool Support"]
+                }
             else:
                 return jsonify({
                     "jsonrpc": "2.0",
                     "id": request_id,
                     "error": {
                         "code": -32601,
-                        "message": f"Tool not found: {tool_name}"
+                        "message": f"Method not found: {tool_name}"
                     }
                 }), 400
 
@@ -169,6 +227,15 @@ def mcp():
                 }
             }), 400
 
+    except json.JSONDecodeError as e:
+        return jsonify({
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {
+                "code": -32700,
+                "message": f"Parse error: {str(e)}"
+            }
+        }), 400
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -203,6 +270,7 @@ def sse():
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
+            # CORS header'ları nginx tarafından ekleniyor
         }
     )
     return response
@@ -227,4 +295,3 @@ if __name__ == '__main__':
     print(f"MCP HTTP Server running on port {port}")
     print(f"Server info: {json.dumps(SERVER_INFO, indent=2)}")
     app.run(host='0.0.0.0', port=port)
-
