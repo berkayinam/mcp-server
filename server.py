@@ -76,8 +76,19 @@ def health():
 
 
 # MCP endpoint - ana endpoint
-@app.route('/mcp', methods=['POST'])
+@app.route('/mcp', methods=['GET', 'POST'])
 def mcp():
+    # GET isteği için (health check vb.)
+    if request.method == 'GET':
+        return jsonify({
+            "jsonrpc": "2.0",
+            "result": {
+                "serverInfo": SERVER_INFO,
+                "status": "ok"
+            }
+        })
+    
+    # POST isteği için (MCP protokolü)
     try:
         data = request.get_json()
         method = data.get('method')
