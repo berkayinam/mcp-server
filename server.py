@@ -93,8 +93,14 @@ def mcp():
     
     # POST isteği için (MCP protokolü)
     try:
+        # Request body'yi logla
+        raw_data = request.get_data(as_text=True)
+        print(f"[DEBUG] POST /mcp - Content-Type: {request.content_type}")
+        print(f"[DEBUG] POST /mcp - Raw body: {raw_data[:500]}")
+        
         # JSON parse
         if not request.is_json:
+            print(f"[ERROR] Not JSON - Content-Type: {request.content_type}")
             return jsonify({
                 "jsonrpc": "2.0",
                 "id": None,
@@ -105,6 +111,7 @@ def mcp():
             }), 400
         
         data = request.get_json()
+        print(f"[DEBUG] Parsed JSON: {json.dumps(data, indent=2)[:500]}")
         if not data:
             return jsonify({
                 "jsonrpc": "2.0",
@@ -127,11 +134,12 @@ def mcp():
             }), 400
         
         method = data.get('method')
-        params = data.get('params', {})
-        request_id = data.get('id')
+        params = data.get('params')  # params optional olabilir
+        request_id = data.get('id')  # id optional (notification'lar için)
         
         # Method kontrolü
         if not method:
+            print(f"[ERROR] Method missing in request: {json.dumps(data, indent=2)}")
             return jsonify({
                 "jsonrpc": "2.0",
                 "id": request_id,
@@ -143,9 +151,11 @@ def mcp():
 
         # MCP Methods
         if method == 'initialize':
-            return jsonify({
+            # Initialize için params optional, boş dict olabilir
+            if params is None:
+                params = {}
+            result = {
                 "jsonrpc": "2.0",
-                "id": request_id,
                 "result": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {
@@ -153,7 +163,11 @@ def mcp():
                     },
                     "serverInfo": SERVER_INFO
                 }
-            })
+            }
+            # Notification değilse id ekle
+            if request_id is not None:
+                result["id"] = request_id
+            return jsonify(result)
 
         elif method == 'tools/list':
             return jsonify({
