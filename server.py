@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify, Response
-from flask_cors import CORS
 import json
 import os
 from datetime import datetime
@@ -8,15 +7,8 @@ import time
 
 app = Flask(__name__)
 
-# CORS middleware - inspector ve mcp-use için gerekli
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Accept", "Origin"],
-        "supports_credentials": True
-    }
-})
+# CORS header'ları nginx tarafından yönetiliyor
+# Flask-CORS kullanmıyoruz çünkü nginx zaten tüm CORS header'larını ekliyor
 
 # MCP Server bilgileri
 SERVER_INFO = {
@@ -190,9 +182,8 @@ def sse():
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true'
+            'Connection': 'keep-alive'
+            # CORS header'ları nginx tarafından ekleniyor
         }
     )
     return response
