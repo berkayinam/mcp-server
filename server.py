@@ -83,9 +83,30 @@ def mcp():
     # POST isteği için (MCP protokolü)
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32700,
+                    "message": "Parse error: Invalid JSON"
+                }
+            }), 400
+        
         method = data.get('method')
         params = data.get('params', {})
         request_id = data.get('id')
+        
+        # Method kontrolü
+        if not method:
+            return jsonify({
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {
+                    "code": -32600,
+                    "message": "Invalid Request: 'method' is required"
+                }
+            }), 400
 
         if method == 'initialize':
             return jsonify({
@@ -154,9 +175,13 @@ def mcp():
             }), 400
 
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in /mcp endpoint: {str(e)}")
+        print(f"Traceback: {error_trace}")
         return jsonify({
             "jsonrpc": "2.0",
-            "id": request.get_json().get('id') if request.is_json else None,
+            "id": request.get_json().get('id') if request.is_json and request.get_json() else None,
             "error": {
                 "code": -32603,
                 "message": "Internal error",
@@ -183,7 +208,6 @@ def sse():
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive'
-            # CORS header'ları nginx tarafından ekleniyor
         }
     )
     return response
