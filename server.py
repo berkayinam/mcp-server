@@ -3,6 +3,16 @@ import json
 import os
 from datetime import datetime
 import time
+import logging
+import sys
+
+# Logging yapılandırması
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -95,12 +105,13 @@ def mcp():
     try:
         # Request body'yi logla
         raw_data = request.get_data(as_text=True)
-        print(f"[DEBUG] POST /mcp - Content-Type: {request.content_type}")
-        print(f"[DEBUG] POST /mcp - Raw body: {raw_data[:500]}")
+        logger.debug(f"POST /mcp - Content-Type: {request.content_type}")
+        logger.debug(f"POST /mcp - Raw body: {raw_data[:500]}")
+        logger.debug(f"POST /mcp - Headers: {dict(request.headers)}")
         
         # JSON parse
         if not request.is_json:
-            print(f"[ERROR] Not JSON - Content-Type: {request.content_type}")
+            logger.error(f"Not JSON - Content-Type: {request.content_type}, Body: {raw_data[:200]}")
             return jsonify({
                 "jsonrpc": "2.0",
                 "id": None,
@@ -111,8 +122,9 @@ def mcp():
             }), 400
         
         data = request.get_json()
-        print(f"[DEBUG] Parsed JSON: {json.dumps(data, indent=2)[:500]}")
+        logger.debug(f"Parsed JSON: {json.dumps(data, indent=2)[:500]}")
         if not data:
+            logger.error("Empty JSON data")
             return jsonify({
                 "jsonrpc": "2.0",
                 "id": None,
@@ -139,7 +151,7 @@ def mcp():
         
         # Method kontrolü
         if not method:
-            print(f"[ERROR] Method missing in request: {json.dumps(data, indent=2)}")
+            logger.error(f"Method missing in request: {json.dumps(data, indent=2)}")
             return jsonify({
                 "jsonrpc": "2.0",
                 "id": request_id,
