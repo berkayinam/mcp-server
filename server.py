@@ -7,16 +7,11 @@ import time
 
 app = Flask(__name__)
 
-# CORS header'ları nginx tarafından yönetiliyor
-# Flask-CORS kullanmıyoruz çünkü nginx zaten tüm CORS header'larını ekliyor
-
-# MCP Server bilgileri
 SERVER_INFO = {
-    "name": "test-github-mcp-server",
+    "name": "ZZeti-MCP-Server",
     "version": "1.0.0"
 }
 
-# Basit tool'lar
 TOOLS = [
     {
         "name": "echo",
